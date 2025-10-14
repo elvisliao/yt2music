@@ -32,13 +32,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+       - name: Cache dependencies
+         uses: actions/cache@v4
+         with:
+           path: ~\AppData\Local\pip\Cache
+           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+           restore-keys: |
+             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -60,12 +60,12 @@ jobs:
           $sizeMB = [math]::Round($file.Length / 1MB, 2)
           echo "size=$sizeMB" >> $env:GITHUB_OUTPUT
 
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: YouTube_MP3_Downloader_Windows
-          path: dist/YouTube_MP3_Downloader.exe
-          retention-days: 30
+       - name: Upload Windows artifact
+         uses: actions/upload-artifact@v4
+         with:
+           name: YouTube_MP3_Downloader_Windows
+           path: dist/YouTube_MP3_Downloader.exe
+           retention-days: 30
 
   build-macos:
     if: github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos'
@@ -80,13 +80,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/Library/Caches/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+       - name: Cache dependencies
+         uses: actions/cache@v4
+         with:
+           path: ~/Library/Caches/pip
+           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+           restore-keys: |
+             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -109,12 +109,12 @@ jobs:
             echo "size=$size" >> $GITHUB_OUTPUT
           fi
 
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: YouTube_MP3_Downloader_macOS
-          path: dist/YouTube_MP3_Downloader
-          retention-days: 30
+       - name: Upload macOS artifact
+         uses: actions/upload-artifact@v4
+         with:
+           name: YouTube_MP3_Downloader_macOS
+           path: dist/YouTube_MP3_Downloader
+           retention-days: 30
 
   build-linux:
     if: github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux'
@@ -129,13 +129,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+       - name: Cache dependencies
+         uses: actions/cache@v4
+         with:
+           path: ~/.cache/pip
+           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+           restore-keys: |
+             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -158,12 +158,12 @@ jobs:
             echo "size=$size" >> $GITHUB_OUTPUT
           fi
 
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: YouTube_MP3_Downloader_Linux
-          path: dist/YouTube_MP3_Downloader
-          retention-days: 30
+       - name: Upload Linux artifact
+         uses: actions/upload-artifact@v4
+         with:
+           name: YouTube_MP3_Downloader_Linux
+           path: dist/YouTube_MP3_Downloader
+           retention-days: 30
 
   create-release:
     if: startsWith(github.ref, 'refs/tags/')
@@ -171,8 +171,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v3
+       - name: Download all artifacts
+         uses: actions/download-artifact@v4
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
