@@ -55,7 +55,7 @@ def test_config_manager():
             test_config = {
                 "output_dir": str(Path.home() / "Downloads"),
                 "bitrate": "192",
-                "theme": "dark"
+                "theme": "dark",
             }
             json.dump(test_config, f)
             temp_path = f.name
@@ -90,6 +90,7 @@ def test_main_module():
 
         # 嘗試導入主模組
         import importlib.util
+
         spec = importlib.util.spec_from_file_location("main", "main.py")
         if spec is None:
             print("FAILED - Could not create module spec")
@@ -125,6 +126,7 @@ def test_gui_components():
         # 測試 CustomTkinter (如果可用)
         try:
             import customtkinter as ctk
+
             ctk_frame = ctk.CTkFrame(root)
             ctk_label = ctk.CTkLabel(ctk_frame, text="Test")
             print("OK - CustomTkinter components")
@@ -189,7 +191,7 @@ def test_ytdlp_integration():
 
         # 測試基本功能（不實際下載）
         test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-        
+
         try:
             # 只提取資訊，不下載
             info = ydl.extract_info(test_url, download=False)
@@ -220,7 +222,7 @@ def main():
         ("Main Module", test_main_module),
         ("GUI Components", test_gui_components),
         ("File Operations", test_file_operations),
-        ("yt-dlp Integration", test_ytdlp_integration)
+        ("yt-dlp Integration", test_ytdlp_integration),
     ]
 
     passed = 0
