@@ -1,0 +1,14 @@
+# YouTube MP3 Professional Downloader Requirements
+# Python 3.10+ required
+
+# GUI Framework (optional, falls back to tkinter if not available)
+customtkinter>=5.2.0
+
+# YouTube downloader
+yt-dlp>=2023.12.30
+
+# Additional dependencies for packaging
+pyinstaller>=6.0.0
+
+# Optional: For better path handling
+pathlib2>=2.3.7; python_version < "3.4"
