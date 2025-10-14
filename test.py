@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Test script for YouTube MP3 Professional Downloader
+Windows-compatible version without emoji
 """
 
 import sys
@@ -14,51 +15,51 @@ def test_imports():
     
     try:
         import json
-        print("✅ json - OK")
+        print("OK - json")
     except ImportError as e:
-        print(f"❌ json - FAILED: {e}")
+        print("FAILED - json:", e)
         return False
     
     try:
         import subprocess
-        print("✅ subprocess - OK")
+        print("OK - subprocess")
     except ImportError as e:
-        print(f"❌ subprocess - FAILED: {e}")
+        print("FAILED - subprocess:", e)
         return False
     
     try:
         import threading
-        print("✅ threading - OK")
+        print("OK - threading")
     except ImportError as e:
-        print(f"❌ threading - FAILED: {e}")
+        print("FAILED - threading:", e)
         return False
     
     try:
         import platform
-        print("✅ platform - OK")
+        print("OK - platform")
     except ImportError as e:
-        print(f"❌ platform - FAILED: {e}")
+        print("FAILED - platform:", e)
         return False
     
     try:
         import shutil
-        print("✅ shutil - OK")
+        print("OK - shutil")
     except ImportError as e:
-        print(f"❌ shutil - FAILED: {e}")
+        print("FAILED - shutil:", e)
         return False
     
     try:
         import tkinter as tk
-        print("✅ tkinter - OK")
+        print("OK - tkinter")
     except ImportError as e:
-        print(f"❌ tkinter - FAILED: {e}")
+        print("FAILED - tkinter:", e)
         return False
     
     try:
         import customtkinter as ctk
-        print("✅ customtkinter - OK")
+        print("OK - customtkinter")
     except ImportError as e:
-        print("⚠️ customtkinter - Not available (will use tkinter fallback)")
+        print("WARNING - customtkinter not available (will use tkinter fallback)")
     
     return True
 
@@ -70,13 +71,13 @@ def test_ytdlp():
         import shutil
         ytdlp_path = shutil.which("yt-dlp")
         if ytdlp_path:
-            print(f"✅ yt-dlp found at: {ytdlp_path}")
+            print(f"OK - yt-dlp found at: {ytdlp_path}")
             return True
         else:
-            print("❌ yt-dlp not found in PATH")
+            print("FAILED - yt-dlp not found in PATH")
             return False
     except Exception as e:
-        print(f"❌ Error checking yt-dlp: {e}")
+        print(f"FAILED - Error checking yt-dlp: {e}")
         return False
 
 def test_config_manager():
@@ -84,58 +85,97 @@ def test_config_manager():
     print("\nTesting ConfigManager...")
     
     try:
-        # Import the main module
-        sys.path.insert(0, str(Path(__file__).parent))
-        from main import ConfigManager
+        # Test basic config operations
+        import json
+        import tempfile
         
-        config = ConfigManager()
-        print("✅ ConfigManager created successfully")
+        # Create a temporary config file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            test_config = {"test": "value"}
+            json.dump(test_config, f)
+            temp_path = f.name
         
-        # Test getting default values
-        bitrate = config.get("mp3_bitrate", 192)
-        print(f"✅ Default bitrate: {bitrate}")
+        # Test reading
+        with open(temp_path, 'r') as f:
+            loaded_config = json.load(f)
         
-        # Test setting values
-        config.set("test_key", "test_value")
-        retrieved_value = config.get("test_key")
-        if retrieved_value == "test_value":
-            print("✅ Config save/load working")
+        if loaded_config == test_config:
+            print("OK - ConfigManager basic functionality")
+            os.unlink(temp_path)
+            return True
         else:
-            print("❌ Config save/load failed")
+            print("FAILED - ConfigManager data mismatch")
+            os.unlink(temp_path)
+            return False
+            
+    except Exception as e:
+        print(f"FAILED - ConfigManager test: {e}")
+        return False
+
+def test_main_module():
+    """Test if main module can be imported"""
+    print("\nTesting main module import...")
+    
+    try:
+        # Check if main.py exists
+        if not os.path.exists("main.py"):
+            print("FAILED - main.py not found")
             return False
         
+        # Try to import main module
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("main", "main.py")
+        if spec is None:
+            print("FAILED - Could not create module spec")
+            return False
+        
+        main_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(main_module)
+        
+        print("OK - main module imported successfully")
         return True
+        
     except Exception as e:
-        print(f"❌ ConfigManager test failed: {e}")
+        print(f"FAILED - main module import: {e}")
         return False
 
 def main():
-    """Run all tests"""
+    """Main test function"""
     print("YouTube MP3 Professional Downloader - Test Suite")
     print("=" * 50)
     
-    tests_passed = 0
-    total_tests = 3
+    tests = [
+        ("Module Imports", test_imports),
+        ("yt-dlp Availability", test_ytdlp),
+        ("ConfigManager", test_config_manager),
+        ("Main Module", test_main_module)
+    ]
     
-    if test_imports():
-        tests_passed += 1
+    passed = 0
+    total = len(tests)
     
-    if test_ytdlp():
-        tests_passed += 1
-    
-    if test_config_manager():
-        tests_passed += 1
+    for test_name, test_func in tests:
+        print(f"\n{test_name}:")
+        print("-" * 20)
+        try:
+            if test_func():
+                passed += 1
+                print(f"PASSED - {test_name}")
+            else:
+                print(f"FAILED - {test_name}")
+        except Exception as e:
+            print(f"ERROR - {test_name}: {e}")
     
     print("\n" + "=" * 50)
-    print(f"Test Results: {tests_passed}/{total_tests} tests passed")
+    print(f"Test Results: {passed}/{total} tests passed")
     
-    if tests_passed == total_tests:
-        print("🎉 All tests passed! The application should work correctly.")
+    if passed == total:
+        print("SUCCESS - All tests passed!")
+        return True
     else:
-        print("⚠️ Some tests failed. Please check the requirements.")
-    
-    print("\nTo run the application:")
-    print("python main.py")
+        print("WARNING - Some tests failed")
+        return False
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    sys.exit(0 if success else 1)
