@@ -1,0 +1,189 @@
+name: Multi-Platform Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - windows
+        - macos
+        - linux
+
+jobs:
+  build-windows:
+    if: github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' || github.event.inputs.platform == ''
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run tests
+      run: |
+        python functional_test.py
+        
+    - name: Build Windows executable
+      run: |
+        pyinstaller --onefile --windowed --name "YouTube_MP3_Downloader" --optimize=2 --strip --exclude-module matplotlib --exclude-module numpy --exclude-module scipy main.py
+        
+    - name: Get file size
+      id: file-size
+      run: |
+        $file = Get-Item "dist\YouTube_MP3_Downloader.exe"
+        $sizeMB = [math]::Round($file.Length / 1MB, 2)
+        echo "size=$sizeMB" >> $env:GITHUB_OUTPUT
+        
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: YouTube_MP3_Downloader_Windows
+        path: dist/YouTube_MP3_Downloader.exe
+        retention-days: 30
+
+  build-macos:
+    if: github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos'
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/Library/Caches/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run tests
+      run: |
+        python functional_test.py
+        
+    - name: Build macOS app
+      run: |
+        pyinstaller --onefile --windowed --name "YouTube_MP3_Downloader" --optimize=2 --strip --exclude-module matplotlib --exclude-module numpy --exclude-module scipy main.py
+        
+    - name: Get file size
+      id: file-size
+      run: |
+        if [ -f "dist/YouTube_MP3_Downloader" ]; then
+          size=$(du -m "dist/YouTube_MP3_Downloader" | cut -f1)
+          echo "size=$size" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: YouTube_MP3_Downloader_macOS
+        path: dist/YouTube_MP3_Downloader
+        retention-days: 30
+
+  build-linux:
+    if: github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run tests
+      run: |
+        python functional_test.py
+        
+    - name: Build Linux executable
+      run: |
+        pyinstaller --onefile --name "YouTube_MP3_Downloader" --optimize=2 --strip --exclude-module matplotlib --exclude-module numpy --exclude-module scipy main.py
+        
+    - name: Get file size
+      id: file-size
+      run: |
+        if [ -f "dist/YouTube_MP3_Downloader" ]; then
+          size=$(du -m "dist/YouTube_MP3_Downloader" | cut -f1)
+          echo "size=$size" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload Linux artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: YouTube_MP3_Downloader_Linux
+        path: dist/YouTube_MP3_Downloader
+        retention-days: 30
+
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          YouTube_MP3_Downloader_Windows/YouTube_MP3_Downloader.exe
+          YouTube_MP3_Downloader_macOS/YouTube_MP3_Downloader
+          YouTube_MP3_Downloader_Linux/YouTube_MP3_Downloader
+        name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
