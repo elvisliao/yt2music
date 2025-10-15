@@ -136,19 +136,114 @@ class DownloadManager:
 
     def __init__(self, config_manager: ConfigManager):
         self.config = config_manager
-        # Prefer external managed yt-dlp so it can auto-update
-        try:
-            from ytdlp_manager import find_or_install_ytdlp  # lazy import
-
-            update_channel = str(self.config.get("ytdlp_update_channel", "nightly"))
-            auto_update = bool(self.config.get("ytdlp_auto_update", True))
-            external = find_or_install_ytdlp(Path.cwd(), channel=update_channel, auto_update=auto_update)
-        except Exception:
-            external = None
-
-        self.ytdlp_path = external or self._find_ytdlp_executable()
+        # Use system-installed yt-dlp; no bundled binary
+        self.ytdlp_path = self._find_ytdlp_executable()
         self.is_downloading = False
         self.current_process = None
+
+    def _get_local_ytdlp_version(self) -> Optional[str]:
+        """Return local yt-dlp version string or None."""
+        candidate = self.ytdlp_path or shutil.which("yt-dlp")
+        if not candidate:
+            return None
+        try:
+            proc = subprocess.run(
+                [candidate, "--version"], capture_output=True, text=True, timeout=6
+            )
+            v = (proc.stdout or "").strip().splitlines()[0].strip()
+            return v or None
+        except Exception:
+            return None
+
+    def _get_latest_ytdlp_version(self, channel: str) -> Optional[str]:
+        """Best-effort fetch latest version tag for the given channel from GitHub."""
+        repo = {
+            "stable": "yt-dlp/yt-dlp",
+            "nightly": "yt-dlp/yt-dlp-nightly-builds",
+            "master": "yt-dlp/yt-dlp-master-builds",
+        }.get(channel, "yt-dlp/yt-dlp-nightly-builds")
+        url = f"https://api.github.com/repos/{repo}/releases/latest"
+        try:
+            import urllib.request
+
+            req = urllib.request.Request(url, headers={"User-Agent": "yt2d-updater"})
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+                tag = (
+                    (data.get("tag_name") or data.get("name") or "").lstrip("v").strip()
+                )
+                return tag or None
+        except Exception:
+            return None
+
+    def update_ytdlp_async(
+        self,
+        channel: str = "nightly",
+        on_start=None,
+        on_done=None,
+        timeout_sec: int = 15,
+    ) -> None:
+        """Background self-update for yt-dlp. Falls back to pip when needed."""
+
+        def _worker():
+            success = False
+            candidate = self.ytdlp_path or shutil.which("yt-dlp")
+            if not candidate:
+                # Try install if missing
+                try:
+                    pip_cmd = [sys.executable, "-m", "pip", "install", "-U"]
+                    if channel == "nightly":
+                        pip_cmd += ["--pre"]
+                    pip_cmd += ["yt-dlp"]
+                    subprocess.run(pip_cmd, timeout=max(20, timeout_sec))
+                    candidate = shutil.which("yt-dlp")
+                except Exception:
+                    candidate = None
+            if on_start:
+                try:
+                    on_start()
+                except Exception:
+                    pass
+            if candidate:
+                try:
+                    # Skip if already latest (best-effort)
+                    lv = self._get_local_ytdlp_version()
+                    gv = self._get_latest_ytdlp_version(channel)
+                    if not (lv and gv and lv == gv):
+                        proc = subprocess.run(
+                            [candidate, "--update-to", channel],
+                            timeout=timeout_sec,
+                            capture_output=True,
+                            text=True,
+                        )
+                        success = proc.returncode == 0
+                        out = (proc.stdout or "") + "\n" + (proc.stderr or "")
+                        if (not success) and (
+                            "Use that to update" in out
+                            or "installed yt-dlp with pip" in out
+                        ):
+                            pip_cmd = [sys.executable, "-m", "pip", "install", "-U"]
+                            if channel == "nightly":
+                                pip_cmd += ["--pre"]
+                            pip_cmd += ["yt-dlp"]
+                            proc2 = subprocess.run(
+                                pip_cmd,
+                                timeout=max(20, timeout_sec),
+                                capture_output=True,
+                                text=True,
+                            )
+                            success = proc2.returncode == 0
+                    else:
+                        success = True
+                except Exception:
+                    success = False
+            if on_done:
+                try:
+                    on_done(success)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _find_ytdlp_executable(self) -> Optional[str]:
         """Find yt-dlp executable in system PATH or common locations"""
@@ -210,10 +305,16 @@ class DownloadManager:
         # Ensure output directory exists
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-        # Build command
-        cmd = [
-            self.ytdlp_path,
-            "-x",  # Extract audio only
+        # Build command (prefer system yt-dlp; fallback to python -m yt_dlp)
+        if self.ytdlp_path:
+            launcher = [self.ytdlp_path]
+        elif shutil.which("yt-dlp"):
+            launcher = ["yt-dlp"]
+        else:
+            launcher = [sys.executable, "-m", "yt_dlp"]
+
+        cmd = launcher + [
+            "-x",
             "--audio-format",
             "mp3",
             "--audio-quality",
@@ -375,6 +476,44 @@ class YouTubeDownloaderApp:
         # Configure style for ttk widgets
         style = ttk.Style()
         style.theme_use('clam')
+        # YouTube-inspired palette
+        # Primary red button
+        style.configure(
+            'YT.Primary.TButton',
+            padding=8,
+            font=('Arial', 12, 'bold'),
+            foreground='white',
+            background='#FF0000',
+        )
+        style.map(
+            'YT.Primary.TButton',
+            background=[('active', '#CC0000'), ('disabled', '#9CA3AF')],
+        )
+        # Secondary dark button
+        style.configure(
+            'YT.Secondary.TButton',
+            padding=8,
+            font=('Arial', 12),
+            foreground='white',
+            background='#303030',
+        )
+        style.map(
+            'YT.Secondary.TButton',
+            background=[('active', '#1F1F1F'), ('disabled', '#4B5563')],
+        )
+        # Combobox (dark field with white text)
+        style.configure(
+            'YT.TCombobox',
+            padding=6,
+            fieldbackground='#202020',
+            background='#202020',
+            foreground='white',
+        )
+        style.map(
+            'YT.TCombobox',
+            fieldbackground=[('readonly', '#202020')],
+            foreground=[('readonly', 'white')],
+        )
 
     def _setup_ui(self):
         """Setup user interface"""
@@ -401,6 +540,17 @@ class YouTubeDownloaderApp:
         # Bind window close event
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
 
+        # Trigger yt-dlp auto-update with spinner and timeout
+        update_channel = str(self.config_manager.get("ytdlp_update_channel", "nightly"))
+        if self.config_manager.get("ytdlp_auto_update", True):
+            try:
+                lv = self.download_manager._get_local_ytdlp_version()
+                gv = self.download_manager._get_latest_ytdlp_version(update_channel)
+                if not (lv and gv and lv == gv):
+                    self._show_update_spinner_and_run(update_channel)
+            except Exception:
+                self._show_update_spinner_and_run(update_channel)
+
     def _create_banner(self, parent):
         """Create banner section"""
         if CUSTOM_TKINTER_AVAILABLE:
@@ -422,6 +572,64 @@ class YouTubeDownloaderApp:
 
         banner_frame.pack(fill="x", pady=(0, 20))
         banner_label.pack(pady=20)
+
+    def _show_update_spinner_and_run(self, channel: str):
+        """Show non-blocking spinner window during updater with hard timeout."""
+        if getattr(self, "_update_window_open", False):
+            return
+        self._update_window_open = True
+
+        top = tk.Toplevel(self.root)
+        top.title("更新程式中...")
+        top.geometry("320x100")
+        try:
+            top.attributes("-topmost", True)
+        except Exception:
+            pass
+
+        if CUSTOM_TKINTER_AVAILABLE:
+            frame = CTkFrame(top)
+            frame.pack(fill="both", expand=True, padx=16, pady=16)
+            label = CTkLabel(frame, text=f"更新程式到 {channel}...")
+            label.pack(pady=(0, 8))
+            pb = ctk.CTkProgressBar(frame, mode="indeterminate")
+            pb.pack(fill="x")
+            pb.start()
+        else:
+            frame = tk.Frame(top)
+            frame.pack(fill="both", expand=True, padx=16, pady=16)
+            label = tk.Label(frame, text=f"更新程式到 {channel}...")
+            label.pack(pady=(0, 8))
+            pb = ttk.Progressbar(frame, mode="indeterminate")
+            pb.pack(fill="x")
+            pb.start(10)
+
+        def safe_close():
+            try:
+                pb.stop()
+            except Exception:
+                pass
+            try:
+                top.destroy()
+            except Exception:
+                pass
+            self._update_window_open = False
+
+        close_after_id = top.after(15000, safe_close)
+
+        def on_start():
+            pass
+
+        def on_done(_ok: bool):
+            try:
+                top.after_cancel(close_after_id)
+            except Exception:
+                pass
+            safe_close()
+
+        self.download_manager.update_ytdlp_async(
+            channel, on_start=on_start, on_done=on_done
+        )
 
     def _create_input_section(self, parent):
         """Create URL input section"""
@@ -449,12 +657,12 @@ class YouTubeDownloaderApp:
                 bg='#2b2b2b',
                 fg='white',
             )
-            self.url_entry = CTkEntry(input_frame, height=2, font=("Arial", 12))
+            # tk.Entry does not support 'height' option; use default height
+            self.url_entry = CTkEntry(input_frame, font=("Arial", 12))
             self.download_btn = CTkButton(
                 input_frame,
                 text="開始下載",
                 command=self._start_download,
-                height=2,
                 font=("Arial", 14, "bold"),
             )
 
