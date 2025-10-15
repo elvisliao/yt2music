@@ -33,7 +33,8 @@ def build_executable():
     # Platform-specific settings
     if system == "Windows":
         name = "YouTube_MP3_Downloader.exe"
-        cmd = f"{base_cmd} --name YouTube_MP3_Downloader main.py"
+        # Enhanced Windows build with better compatibility
+        cmd = f"{base_cmd} --name YouTube_MP3_Downloader --noupx --hidden-import=customtkinter --hidden-import=yt_dlp --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --hidden-import=tkinter.simpledialog --hidden-import=json --hidden-import=subprocess --hidden-import=threading --hidden-import=platform --hidden-import=shutil --hidden-import=pathlib main.py"
     elif system == "Darwin":  # macOS
         name = "YouTube_MP3_Downloader"
         cmd = f"{base_cmd} --name YouTube_MP3_Downloader main.py"

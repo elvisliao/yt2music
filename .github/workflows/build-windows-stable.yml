@@ -1,0 +1,142 @@
+name: Build Windows Executable (Stable)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install --upgrade pyinstaller
+
+      - name: Verify installation
+        run: |
+          python --version
+          pip list
+          python -c "import customtkinter; print('CustomTkinter version:', customtkinter.__version__)"
+          python -c "import yt_dlp; print('yt-dlp version:', yt_dlp.version.__version__)"
+          pyinstaller --version
+
+      - name: Run tests
+        run: |
+          python functional_test.py
+          python test.py
+
+      - name: Clean previous builds
+        run: |
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
+          if (Test-Path "*.spec") { Remove-Item -Force "*.spec" }
+
+      - name: Build executable (Method 1 - Standard)
+        id: build-standard
+        run: |
+          pyinstaller --onefile --windowed --name "YouTube_MP3_Downloader_Standard" --optimize=2 --strip --hidden-import=customtkinter --hidden-import=yt_dlp --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --hidden-import=tkinter.simpledialog --hidden-import=json --hidden-import=subprocess --hidden-import=threading --hidden-import=platform --hidden-import=shutil --hidden-import=pathlib main.py
+        continue-on-error: true
+
+      - name: Build executable (Method 2 - No UPX)
+        id: build-noupx
+        run: |
+          pyinstaller --onefile --windowed --name "YouTube_MP3_Downloader_NoUPX" --optimize=2 --strip --noupx --hidden-import=customtkinter --hidden-import=yt_dlp --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --hidden-import=tkinter.simpledialog --hidden-import=json --hidden-import=subprocess --hidden-import=threading --hidden-import=platform --hidden-import=shutil --hidden-import=pathlib main.py
+        continue-on-error: true
+
+      - name: Build executable (Method 3 - Console)
+        id: build-console
+        run: |
+          pyinstaller --onefile --name "YouTube_MP3_Downloader_Console" --optimize=2 --strip --hidden-import=customtkinter --hidden-import=yt_dlp --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --hidden-import=tkinter.simpledialog --hidden-import=json --hidden-import=subprocess --hidden-import=threading --hidden-import=platform --hidden-import=shutil --hidden-import=pathlib main.py
+        continue-on-error: true
+
+      - name: Test executables
+        run: |
+          $success = $false
+          
+          # Test Standard build
+          if (Test-Path "dist\YouTube_MP3_Downloader_Standard.exe") {
+            Write-Host "Testing Standard build..."
+            try {
+              Start-Process -FilePath "dist\YouTube_MP3_Downloader_Standard.exe" -ArgumentList "--help" -Wait -NoNewWindow -PassThru
+              Write-Host "Standard build test passed"
+              $success = $true
+            } catch {
+              Write-Host "Standard build test failed: $_"
+            }
+          }
+          
+          # Test NoUPX build
+          if (Test-Path "dist\YouTube_MP3_Downloader_NoUPX.exe") {
+            Write-Host "Testing NoUPX build..."
+            try {
+              Start-Process -FilePath "dist\YouTube_MP3_Downloader_NoUPX.exe" -ArgumentList "--help" -Wait -NoNewWindow -PassThru
+              Write-Host "NoUPX build test passed"
+              $success = $true
+            } catch {
+              Write-Host "NoUPX build test failed: $_"
+            }
+          }
+          
+          # Test Console build
+          if (Test-Path "dist\YouTube_MP3_Downloader_Console.exe") {
+            Write-Host "Testing Console build..."
+            try {
+              Start-Process -FilePath "dist\YouTube_MP3_Downloader_Console.exe" -ArgumentList "--help" -Wait -NoNewWindow -PassThru
+              Write-Host "Console build test passed"
+              $success = $true
+            } catch {
+              Write-Host "Console build test failed: $_"
+            }
+          }
+          
+          if (-not $success) {
+            Write-Error "All builds failed testing"
+            exit 1
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: YouTube_MP3_Downloader_Windows_Stable
+          path: |
+            dist/YouTube_MP3_Downloader_Standard.exe
+            dist/YouTube_MP3_Downloader_NoUPX.exe
+            dist/YouTube_MP3_Downloader_Console.exe
+          retention-days: 30
+        if: always()
+
+      - name: Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/YouTube_MP3_Downloader_Standard.exe
+            dist/YouTube_MP3_Downloader_NoUPX.exe
+            dist/YouTube_MP3_Downloader_Console.exe
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
