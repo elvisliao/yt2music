@@ -4,8 +4,8 @@
 # GUI Framework (optional, falls back to tkinter if not available)
 customtkinter>=5.2.0
 
-# YouTube downloader
-yt-dlp>=2023.12.30
+# YouTube downloader (use external binary managed by app)
+# yt-dlp (removed from pip requirements)
 
 # Additional dependencies for packaging
 pyinstaller>=6.0.0

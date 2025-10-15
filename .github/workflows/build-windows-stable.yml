@@ -39,7 +39,6 @@ jobs:
           python --version
           pip list
           python -c "import customtkinter; print('CustomTkinter version:', customtkinter.__version__)"
-          python -c "import yt_dlp; print('yt-dlp version:', yt_dlp.version.__version__)"
           pyinstaller --version
 
       - name: Run tests

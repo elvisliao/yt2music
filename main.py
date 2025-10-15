@@ -93,6 +93,9 @@ class ConfigManager:
             "output_directory": self._get_default_download_dir(),
             "window_geometry": "800x600",
             "theme": "dark",
+            # External yt-dlp updater
+            "ytdlp_auto_update": True,
+            "ytdlp_update_channel": "nightly",
         }
 
     def _ensure_config_dir(self):
@@ -137,7 +140,9 @@ class DownloadManager:
         try:
             from ytdlp_manager import find_or_install_ytdlp  # lazy import
 
-            external = find_or_install_ytdlp(Path.cwd())
+            update_channel = str(self.config.get("ytdlp_update_channel", "nightly"))
+            auto_update = bool(self.config.get("ytdlp_auto_update", True))
+            external = find_or_install_ytdlp(Path.cwd(), channel=update_channel, auto_update=auto_update)
         except Exception:
             external = None
 

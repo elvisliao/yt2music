@@ -102,7 +102,7 @@ def download_latest(dest_path: Path, timeout_sec: int = 30) -> bool:
         return False
 
 
-def ensure_external_ytdlp(base_dir: Path) -> Optional[Path]:
+def ensure_external_ytdlp(base_dir: Path, channel: str = "nightly", auto_update: bool = True, timeout_sec: int = 20) -> Optional[Path]:
     """Ensure an external yt-dlp binary exists and is up to date.
 
     - The binary is placed in base_dir/_bin/yt-dlp[.exe]
@@ -118,17 +118,26 @@ def ensure_external_ytdlp(base_dir: Path) -> Optional[Path]:
             return binary_path
         return binary_path if binary_path.exists() else None
 
-    # Check versions; if cannot query remote, keep current
-    local_ver = get_local_version(binary_path)
-    latest_ver = get_latest_version_from_api()
-    if latest_ver and local_ver and local_ver != latest_ver:
-        # Attempt update
-        download_latest(binary_path)
+    # Self-update using yt-dlp native updater for selected channel
+    if auto_update:
+        try:
+            update_args = [str(binary_path)]
+            if channel:
+                update_args += ["--update-to", channel]
+            else:
+                update_args += ["-U"]
+            subprocess.run(update_args, timeout=timeout_sec)
+        except Exception:
+            # Fallback to remote version check if self-update failed silently
+            local_ver = get_local_version(binary_path)
+            latest_ver = get_latest_version_from_api()
+            if latest_ver and local_ver and local_ver != latest_ver:
+                download_latest(binary_path)
 
     return binary_path if binary_path.exists() else None
 
 
-def find_or_install_ytdlp(prefer_external_dir: Optional[Path] = None) -> Optional[str]:
+def find_or_install_ytdlp(prefer_external_dir: Optional[Path] = None, channel: str = "nightly", auto_update: bool = True) -> Optional[str]:
     """Find yt-dlp executable; install external one if not available.
 
     Returns a string path to the executable or None if not available.
@@ -140,7 +149,7 @@ def find_or_install_ytdlp(prefer_external_dir: Optional[Path] = None) -> Optiona
 
     # 2) Ensure external
     base_dir = prefer_external_dir or Path.cwd()
-    ensured = ensure_external_ytdlp(base_dir)
+    ensured = ensure_external_ytdlp(base_dir, channel=channel, auto_update=auto_update)
     if ensured:
         return str(ensured)
     return None
