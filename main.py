@@ -133,7 +133,15 @@ class DownloadManager:
 
     def __init__(self, config_manager: ConfigManager):
         self.config = config_manager
-        self.ytdlp_path = self._find_ytdlp_executable()
+        # Prefer external managed yt-dlp so it can auto-update
+        try:
+            from ytdlp_manager import find_or_install_ytdlp  # lazy import
+
+            external = find_or_install_ytdlp(Path.cwd())
+        except Exception:
+            external = None
+
+        self.ytdlp_path = external or self._find_ytdlp_executable()
         self.is_downloading = False
         self.current_process = None
 
@@ -172,21 +180,21 @@ class DownloadManager:
 
     def is_ytdlp_available(self) -> bool:
         """Check if yt-dlp is available"""
-        return self.ytdlp_path is not None
+        return self.ytdlp_path is not None and Path(self.ytdlp_path).exists()
 
     def get_ytdlp_error_message(self) -> str:
         """Get error message for missing yt-dlp"""
         system = platform.system()
         if system == "Windows":
             return (
-                "yt-dlp 未找到！請下載 yt-dlp.exe 並放置在程式目錄中，\n"
+                "yt-dlp 未找到或無法執行。程式將嘗試自動下載最新 yt-dlp.exe 到 _bin 資料夾。\n"
+                "若仍無法使用，請手動下載 yt-dlp.exe 並放置於程式目錄或加入 PATH，\n"
                 "或使用 pip install yt-dlp 安裝。"
             )
         else:
             return (
-                "yt-dlp 未找到！請使用以下指令安裝：\n"
-                "pip install yt-dlp\n"
-                "或 brew install yt-dlp (macOS)"
+                "yt-dlp 未找到或無法執行。程式將嘗試自動安裝到 _bin。\n"
+                "若失敗，請手動安裝：pip install yt-dlp 或使用系統套件管理工具。"
             )
 
     def _build_command(self, url: str) -> list:
