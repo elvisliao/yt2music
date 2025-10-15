@@ -96,6 +96,7 @@ class ConfigManager:
             # External yt-dlp updater
             "ytdlp_auto_update": True,
             "ytdlp_update_channel": "nightly",
+            "last_ytdlp_update_check": "",
         }
 
     def _ensure_config_dir(self):
@@ -548,13 +549,21 @@ class YouTubeDownloaderApp:
         # Trigger yt-dlp auto-update with spinner and timeout
         update_channel = str(self.config_manager.get("ytdlp_update_channel", "nightly"))
         if self.config_manager.get("ytdlp_auto_update", True):
-            try:
-                lv = self.download_manager._get_local_ytdlp_version()
-                gv = self.download_manager._get_latest_ytdlp_version(update_channel)
-                if not (lv and gv and lv == gv):
-                    self._show_update_spinner_and_run(update_channel)
-            except Exception:
-                self._show_update_spinner_and_run(update_channel)
+            # Guard: Only once per day
+            from datetime import datetime
+
+            last = self.config_manager.get("last_ytdlp_update_check", "")
+            today = datetime.now().strftime("%Y-%m-%d")
+            if last != today:
+                self.config_manager.set("last_ytdlp_update_check", today)
+                try:
+                    lv = self.download_manager._get_local_ytdlp_version()
+                    gv = self.download_manager._get_latest_ytdlp_version(update_channel)
+                    if not (lv and gv and lv == gv):
+                        self._show_update_spinner_and_run(update_channel)
+                except Exception:
+                    # Silent failure: do not loop
+                    pass
 
     def _create_banner(self, parent):
         """Create banner section"""
