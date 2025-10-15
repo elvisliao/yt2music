@@ -26,6 +26,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install --upgrade pyinstaller
 
       - name: Build executable
         run: |
@@ -43,9 +44,9 @@ jobs:
             exit 1
           }
 
-       - name: Upload artifact
-         uses: actions/upload-artifact@v4
-         with:
-           name: YouTube_MP3_Downloader_Windows_Quick
-           path: dist/YouTube_MP3_Downloader.exe
-           retention-days: 7
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YouTube_MP3_Downloader_Windows_Quick
+          path: dist/YouTube_MP3_Downloader.exe
+          retention-days: 7
