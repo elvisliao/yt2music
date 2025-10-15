@@ -453,11 +453,16 @@ class YouTubeDownloaderApp:
         self._adjust_window_size()
 
     def _setup_customtkinter(self):
-        """Setup CustomTkinter theme and appearance"""
-        ctk.set_appearance_mode(self.config_manager.get("theme", "dark"))
-        ctk.set_default_color_theme("blue")
+        """Setup CustomTkinter theme and appearance (flat red/white/black)."""
+        # Force light, apply custom theme file if present
+        ctk.set_appearance_mode("light")
+        try:
+            ctk.set_default_color_theme("yt_theme.json")
+        except Exception:
+            # Fallback to built-in, but keep light look
+            ctk.set_default_color_theme("green")
 
-        self.root.title("YouTube MP3 Professional Downloader")
+        self.root.title("YouTube MP3 專業下載器")
         # Set initial size but allow content to determine final size
         self.root.geometry("800x500")
         self.root.minsize(600, 400)
@@ -466,7 +471,7 @@ class YouTubeDownloaderApp:
 
     def _setup_tkinter(self):
         """Setup standard Tkinter appearance"""
-        self.root.title("YouTube MP3 Professional Downloader")
+        self.root.title("YouTube MP3 專業下載器")
         # Set initial size but allow content to determine final size
         self.root.geometry("800x500")
         self.root.minsize(600, 400)
@@ -647,6 +652,9 @@ class YouTubeDownloaderApp:
                 command=self._start_download,
                 height=40,
                 font=("Arial", 14, "bold"),
+                fg_color="#D70000",
+                hover_color="#B00000",
+                text_color="white",
             )
         else:
             input_frame = CTkFrame(parent, bg='#2b2b2b')
@@ -687,6 +695,10 @@ class YouTubeDownloaderApp:
                 values=["128", "192", "256", "320"],
                 variable=self.bitrate_var,
                 command=self._on_bitrate_change,
+                fg_color="#202020",
+                button_color="#D70000",
+                button_hover_color="#B00000",
+                text_color="white",
             )
 
             # Output directory selection
@@ -703,6 +715,9 @@ class YouTubeDownloaderApp:
                 text="瀏覽...",
                 command=self._browse_output_directory,
                 width=100,
+                fg_color="#303030",
+                hover_color="#1F1F1F",
+                text_color="white",
             )
 
         else:
