@@ -45,6 +45,11 @@ def build_executable():
     # Add optimization flags
     cmd += " --optimize=2 --strip"
     
+    # Ensure vendor binaries are included (yt-dlp external binary)
+    vendor_dir = os.path.join(os.getcwd(), "vendor")
+    if os.path.isdir(vendor_dir):
+        cmd += f" --add-data \"{vendor_dir}{os.sep}*;vendor\""
+
     # Exclude unnecessary modules
     excludes = [
         "matplotlib", "numpy", "scipy", "pandas", "PIL", 

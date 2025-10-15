@@ -24,9 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 
-GITHUB_API_LATEST_RELEASE = (
-    "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
-)
+GITHUB_API_LATEST_RELEASE = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
 
 
 def _binary_name() -> str:
@@ -34,13 +32,33 @@ def _binary_name() -> str:
     return "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp"
 
 
+def _embedded_vendor_path() -> Optional[Path]:
+    """Return path to an embedded yt-dlp binary inside the packaged app if present.
+
+    When PyInstaller onefile runs, resources are extracted under sys._MEIPASS.
+    We package the binary under vendor/yt-dlp(.exe).
+    """
+    try:
+        base_paths = []
+        # Running from PyInstaller bundle
+        if hasattr(sys, "_MEIPASS"):
+            base_paths.append(Path(sys._MEIPASS))
+        # Running from source checkout
+        base_paths.append(Path(__file__).resolve().parent)
+        for base in base_paths:
+            candidate = base / "vendor" / _binary_name()
+            if candidate.exists():
+                return candidate
+    except Exception:
+        return None
+    return None
+
+
 def _download_url_latest_binary() -> str:
     """Return direct download URL for the latest yt-dlp binary for this OS."""
     # Latest convenience URL maintained by yt-dlp project
     if platform.system() == "Windows":
-        return (
-            "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-        )
+        return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
     return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp"
 
 
@@ -62,7 +80,9 @@ def get_local_version(binary_path: Path) -> Optional[str]:
 def get_latest_version_from_api(timeout_sec: int = 5) -> Optional[str]:
     """Query GitHub API for latest release tag. Return tag like '2024.08.06'."""
     try:
-        req = urllib.request.Request(GITHUB_API_LATEST_RELEASE, headers={"User-Agent": "yt2d-updater"})
+        req = urllib.request.Request(
+            GITHUB_API_LATEST_RELEASE, headers={"User-Agent": "yt2d-updater"}
+        )
         with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
             data = json.loads(resp.read().decode("utf-8", errors="ignore"))
             tag = data.get("tag_name") or data.get("name")
@@ -102,7 +122,12 @@ def download_latest(dest_path: Path, timeout_sec: int = 30) -> bool:
         return False
 
 
-def ensure_external_ytdlp(base_dir: Path, channel: str = "nightly", auto_update: bool = True, timeout_sec: int = 20) -> Optional[Path]:
+def ensure_external_ytdlp(
+    base_dir: Path,
+    channel: str = "nightly",
+    auto_update: bool = True,
+    timeout_sec: int = 20,
+) -> Optional[Path]:
     """Ensure an external yt-dlp binary exists and is up to date.
 
     - The binary is placed in base_dir/_bin/yt-dlp[.exe]
@@ -112,8 +137,23 @@ def ensure_external_ytdlp(base_dir: Path, channel: str = "nightly", auto_update:
     bin_dir = base_dir / "_bin"
     binary_path = bin_dir / _binary_name()
 
-    # If binary missing, try download
+    # If binary missing, try embedded vendor first, then download
     if not binary_path.exists():
+        vendor = _embedded_vendor_path()
+        if vendor:
+            try:
+                dest_path.parent.mkdir(parents=True, exist_ok=True)  # type: ignore[name-defined]
+            except Exception:
+                pass
+            try:
+                # Copy embedded vendor to destination
+                data = vendor.read_bytes()
+                with open(binary_path, "wb") as f:
+                    f.write(data)
+                _mark_executable(binary_path)
+                return binary_path
+            except Exception:
+                pass
         if download_latest(binary_path):
             return binary_path
         return binary_path if binary_path.exists() else None
@@ -137,13 +177,19 @@ def ensure_external_ytdlp(base_dir: Path, channel: str = "nightly", auto_update:
     return binary_path if binary_path.exists() else None
 
 
-def find_or_install_ytdlp(prefer_external_dir: Optional[Path] = None, channel: str = "nightly", auto_update: bool = True) -> Optional[str]:
+def find_or_install_ytdlp(
+    prefer_external_dir: Optional[Path] = None,
+    channel: str = "nightly",
+    auto_update: bool = True,
+) -> Optional[str]:
     """Find yt-dlp executable; install external one if not available.
 
     Returns a string path to the executable or None if not available.
     """
     # 1) Prefer existing in PATH
-    path_in_system = shutil_which("yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp")
+    path_in_system = shutil_which(
+        "yt-dlp.exe" if platform.system() == "Windows" else "yt-dlp"
+    )
     if path_in_system:
         return path_in_system
 
@@ -171,5 +217,3 @@ __all__ = [
     "get_local_version",
     "get_latest_version_from_api",
 ]
-
-
